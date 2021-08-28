@@ -1,0 +1,126 @@
+const fs = require("fs");
+const axios = require("axios");
+const request = require("request");
+const macaroon = fs
+  .readFileSync(
+    "/home/umbrel/umbrel/lnd/data/chain/bitcoin/mainnet/admin.macaroon"
+  )
+  .toString("hex");
+
+async function asyncGetRequest(options) {
+  return new Promise((resolve, reject) => {
+    request.get(options, (error, response, body) => resolve({ error, response, body}));
+  });
+}
+async function asyncPostRequest(options) {
+  return new Promise((resolve, reject) => {
+    request.post(options, (error, response, body) => resolve({ error, response, body }));
+  });
+}
+
+let options = {
+  url: "https://localhost:8080/v1/channels",
+  // Work-around for self-signed certificates.
+  rejectUnauthorized: false,
+  json: true,
+  headers: {
+    "Grpc-Metadata-macaroon": macaroon,
+  },
+};
+
+function getOptions(url, requestBody = null) {
+  let options = {
+    url: url,
+    rejectUnauthorized: false,
+    json: true,
+    headers: {
+      "Grpc-Metadata-macaroon": macaroon,
+    },
+    form: JSON.stringify(requestBody)
+  }
+  if (requestBody) {
+    //options.form = JSON.stringify(requestBody);
+  }
+  //console.log(options);
+  return options;
+}
+
+async function getChannels() {
+  let res = await asyncGetRequest(getOptions("https://localhost:8080/v1/channels"));
+  let channels = res.body.channels.map((channel) => {
+    return {
+      active: channel.active,
+      remote_pubkey: channel.remote_pubkey,
+      chan_id: channel.chan_id,
+      capacity: channel.capacity,
+      local_balance: channel.local_balance,
+      remote_balance: channel.remote_balance,
+    }
+  })
+
+  let localHeavy = channels.filter((channel) => {
+    return channel.local_balance > 750000 && ((channel.local_balance/channel.capacity) > .65)
+    //console.log(channel.active, channel.remote_pubkey, channel.chan_id, channel.capacity, channel.local_balance, channel.remote_balance);
+  })
+  let remoteHeavy = channels.filter((channel) => {
+    return channel.remote_balance > 750000 && ((channel.local_balance/channel.capacity) < .35)
+  })
+
+  let routesToScan = [];
+
+  for(let i = 0; i < localHeavy.length; i++) {
+    for(let j = 0; j < remoteHeavy.length; j++) {
+      const route = {
+        destPubKey: localHeavy[i].remote_pubkey,
+        destBalance: localHeavy[i].local_balance,
+        destChanID: localHeavy[i].chan_id,
+        outgoingPubKey: remoteHeavy[j].remote_pubkey,
+        outgoingChanID: remoteHeavy[j].chan_id,
+        outgoingBalance: remoteHeavy[j].local_balance,
+      }
+      routesToScan.push(route);
+    }
+  }
+  //console.log(routesToScan);
+  for(let i = 0; i < routesToScan.length; i++) {
+    let requestBody = {
+      outgoing_chan_id: routesToScan[i].outgoingChanID,
+    }
+    let routeResponse = await asyncGetRequest(getOptions(`https://localhost:8080/v1/graph/routes/${routesToScan[i].destPubKey}/10000?outgoing_chan_id=${routesToScan[i].outgoingChanID}`));
+    let numHops = routeResponse && routeResponse.body.routes && routeResponse.body.routes[0].hops.length
+
+    if(numHops) {
+      console.log(numHops, routesToScan[i].destPubKey, routesToScan[i].outgoingPubKey);
+    }
+  }
+}
+//getChannels();
+
+
+async function getRoutes(pubkey, amount, channelID) {
+  let requestBody = {
+    outgoing_chan_id: channelID,
+  }
+  let res = await asyncGetRequest(getOptions(`https://localhost:8080/v1/graph/routes/${pubkey}/${amount}`, requestBody));
+  console.log(res)
+  console.log(res.body.routes[0].hops);
+}
+
+async function findRebalanceRoutes() {
+  console.log("HII");
+}
+findRebalanceRoutes();
+
+//getRoutes('03e94e144ad749a1cb11972212267fac12c0abfe0ca5a33985dcece556e62a1443', 10000, '762809281549762560');
+
+// TODO: set function for get channels
+
+
+const CHANNEL_LOOKUP = {
+  "020a1df50b701331a29782093210460b10eee0ac5ef6a01b9c51dff9b8fddf5fb0": { alias: "bullbitcoin.com" },
+  "0227ae059fb6db3a2c619bd05ce3f509e1a98335df59cc1b4e817bc6201ad8cdd6": { alias: "THEREDDOT" },
+  "0230a5bca558e6741460c13dd34e636da28e52afd91cf93db87ed1b0392a7466eb": { alias: "Blixt Wallet ��" },
+  "0242a4ae0c5bef18048fbecf995094b74bfb0f7391418d71ed394784373f41e4f3": { alias: "CoinGate" },
+  "0248ad67c43b8c3cddb939d438cf7455ce5301c83f39c185eadc58a59799875a44": { alias: "Hurly007" },
+  "0260fab633066ed7b1d9b9b8a0fac87e1579d1709e874d28a0d171a1f5c43bb877": { alias: southxchange.com
+}
