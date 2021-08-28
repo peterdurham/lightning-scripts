@@ -1,6 +1,8 @@
 const fs = require("fs");
 const axios = require("axios");
 const request = require("request");
+const CHANNEL_LOOKUP = require("./channelLookup");
+console.log(CHANNEL_LOOKUP);
 const macaroon = fs
   .readFileSync(
     "/home/umbrel/umbrel/lnd/data/chain/bitcoin/mainnet/admin.macaroon"
@@ -35,18 +37,64 @@ function getOptions(url, requestBody = null) {
     json: true,
     headers: {
       "Grpc-Metadata-macaroon": macaroon,
-    }
+    },
+    form: JSON.stringify(requestBody)
   }
   if (requestBody) {
-    options.form = JSON.stringify(requestBody);
+    //options.form = JSON.stringify(requestBody);
   }
-console.log(options);
+  //console.log(options);
   return options;
 }
 
 async function getChannels() {
   let res = await asyncGetRequest(getOptions("https://localhost:8080/v1/channels"));
-  console.log(res.body);
+  let channels = res.body.channels.map((channel) => {
+    return {
+      active: channel.active,
+      remote_pubkey: channel.remote_pubkey,
+      chan_id: channel.chan_id,
+      capacity: channel.capacity,
+      local_balance: channel.local_balance,
+      remote_balance: channel.remote_balance,
+    }
+  })
+
+  let localHeavy = channels.filter((channel) => {
+    return channel.local_balance > 750000 && ((channel.local_balance/channel.capacity) > .75)
+    //console.log(channel.active, channel.remote_pubkey, channel.chan_id, channel.capacity, channel.local_balance, channel.remote_balance);
+  })
+  let remoteHeavy = channels.filter((channel) => {
+    return channel.remote_balance > 750000 && ((channel.local_balance/channel.capacity) < .25)
+  })
+
+  let routesToScan = [];
+
+  for(let i = 0; i < localHeavy.length; i++) {
+    for(let j = 0; j < remoteHeavy.length; j++) {
+      const route = {
+        destPubKey: localHeavy[i].remote_pubkey,
+        destBalance: localHeavy[i].local_balance,
+        destChanID: localHeavy[i].chan_id,
+        outgoingPubKey: remoteHeavy[j].remote_pubkey,
+        outgoingChanID: remoteHeavy[j].chan_id,
+        outgoingBalance: remoteHeavy[j].local_balance,
+      }
+      routesToScan.push(route);
+    }
+  }
+  //console.log(routesToScan);
+  for(let i = 0; i < routesToScan.length; i++) {
+    let requestBody = {
+      outgoing_chan_id: routesToScan[i].outgoingChanID,
+    }
+    let routeResponse = await asyncGetRequest(getOptions(`https://localhost:8080/v1/graph/routes/${routesToScan[i].destPubKey}/10000?outgoing_chan_id=${routesToScan[i].outgoingChanID}`));
+    let numHops = routeResponse && routeResponse.body.routes && routeResponse.body.routes[0].hops.length
+
+    if(numHops && numHops < 5) {
+      console.log(numHops, CHANNEL_LOOKUP[routesToScan[i].destPubKey], CHANNEL_LOOKUP[routesToScan[i].outgoingPubKey]);
+    }
+  }
 }
 getChannels();
 
@@ -59,6 +107,9 @@ async function getRoutes(pubkey, amount, channelID) {
   console.log(res)
   console.log(res.body.routes[0].hops);
 }
-//getRoutes('03e94e144ad749a1cb11972212267fac12c0abfe0ca5a33985dcece556e62a1443', 10000, '762809281549762560');
 
-// TODO: set function for get channels
+async function findRebalanceRoutes() {
+  console.log("HII");
+}
+findRebalanceRoutes();
+
