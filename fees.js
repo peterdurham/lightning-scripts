@@ -2,9 +2,11 @@ const utils = require("./utils");
 const { asyncGetRequest, asyncPostRequest, getOptions } = utils;
 
 async function getChannelFees() {
-  let res = await asyncGetRequest(
+  let chanResp = await asyncGetRequest(
     getOptions("https://localhost:8080/v1/channels")
   );
-  console.log(res.body.channels);
+  let feeResp = await asyncGetRequest(getOptions("https://localhost:8080/v1/fees"));
+  console.log(chanResp.body.channels);
+  console.log(feeResp.body);
 }
 getChannelFees();
