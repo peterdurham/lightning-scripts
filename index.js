@@ -1,16 +1,9 @@
-const fs = require("fs");
 const axios = require("axios");
 const request = require("request");
 const CHANNEL_LOOKUP = require("./channelLookup");
 
 const utils = require("./utils");
 const { asyncGetRequest, asyncPostRequest, getOptions } = utils;
-
-const macaroon = fs
-  .readFileSync(
-    "/home/umbrel/umbrel/lnd/data/chain/bitcoin/mainnet/admin.macaroon"
-  )
-  .toString("hex");
 
 async function rebalanceScan() {
   let res = await asyncGetRequest(

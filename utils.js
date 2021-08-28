@@ -1,3 +1,10 @@
+const fs = require("fs");
+const macaroon = fs
+  .readFileSync(
+    "/home/umbrel/umbrel/lnd/data/chain/bitcoin/mainnet/admin.macaroon"
+  )
+  .toString("hex");
+
 async function asyncGetRequest(options) {
   return new Promise((resolve, reject) => {
     request.get(options, (error, response, body) =>
