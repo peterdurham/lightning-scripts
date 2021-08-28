@@ -2,7 +2,7 @@ const fs = require("fs");
 const axios = require("axios");
 const request = require("request");
 const CHANNEL_LOOKUP = require("./channelLookup");
-console.log(CHANNEL_LOOKUP);
+
 const macaroon = fs
   .readFileSync(
     "/home/umbrel/umbrel/lnd/data/chain/bitcoin/mainnet/admin.macaroon"
@@ -92,7 +92,7 @@ async function getChannels() {
     let numHops = routeResponse && routeResponse.body.routes && routeResponse.body.routes[0].hops.length
 
     if(numHops && numHops < 5) {
-      console.log(numHops, CHANNEL_LOOKUP[routesToScan[i].destPubKey], CHANNEL_LOOKUP[routesToScan[i].outgoingPubKey]);
+      console.log(numHops, CHANNEL_LOOKUP.CHANNELS[routesToScan[i].destPubKey], CHANNEL_LOOKUP.CHANNELS[routesToScan[i].outgoingPubKey]);
     }
   }
 }
@@ -111,5 +111,5 @@ async function getRoutes(pubkey, amount, channelID) {
 async function findRebalanceRoutes() {
   console.log("HII");
 }
-findRebalanceRoutes();
+//findRebalanceRoutes();
 
