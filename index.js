@@ -23,13 +23,13 @@ async function rebalanceScan() {
   let localHeavy = channels.filter((channel) => {
     return (
       channel.local_balance > 750000 &&
-      channel.local_balance / channel.capacity > 0.75
+      channel.local_balance / channel.capacity > 0.7
     );
   });
   let remoteHeavy = channels.filter((channel) => {
     return (
       channel.remote_balance > 750000 &&
-      channel.local_balance / channel.capacity < 0.25
+      channel.local_balance / channel.capacity < 0.3
     );
   });
 
